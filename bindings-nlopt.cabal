@@ -19,7 +19,7 @@ source-repository head
 
 library
   exposed-modules: Numeric.Optimization.NLOpt.Bindings
-  build-depends:       base >= 4.6 && <4.9
+  build-depends:       base >= 4.6 && <5
                      , vector >= 0.10
 
   build-tools:         c2hs
@@ -35,8 +35,8 @@ test-suite doctest
   main-is: doctest.hs
   build-depends: base
                , bindings-nlopt
-               , doctest >= 0.9.9
-               , QuickCheck >= 2.8
+               , doctest >= 0.9
+               , QuickCheck >= 2.6
 
 test-suite examples
   type: exitcode-stdio-1.0
