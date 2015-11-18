@@ -183,7 +183,10 @@ foreign import ccall unsafe "wrapper"
 withNloptPrecond :: NloptPrecond -> (FunPtr NloptPrecond -> IO b) -> IO b
 withNloptPrecond f a = mkNloptPrecond f >>= a
 
-{#pointer *nlopt_opt_s as NloptOpt foreign finalizer nlopt_destroy newtype#}
+{#pointer *nlopt_opt_s as NloptOpt foreign newtype#}
+
+foreign import ccall "Numeric/Optimization/NLOpt/Bindings.chs.h &nlopt_destroy"
+  nlopt_destroy :: FinalizerPtr NloptOpt
 
 {- Custom marshalling -}
 
@@ -228,9 +231,34 @@ newImmutableVector n action = do
  , alloca- `Int' peekIntConv*
  , alloca- `Int' peekIntConv* } -> `()' #}
 
-{#fun unsafe nlopt_create as ^ { `NloptAlgorithm', fromIntegral `Word' } -> `NloptOpt' #}
 
-{#fun unsafe nlopt_copy as ^ { `NloptOpt' } -> `NloptOpt' #}
+-- Only new versions of c2hs can do finalizers themselves
+-- automatically, so for these, we have to use the generated versions
+-- for now.
+
+-- {#fun unsafe nlopt_create as ^ { `NloptAlgorithm', fromIntegral `Word' } -> `NloptOpt' #}
+-- {#fun unsafe nlopt_copy as ^ { `NloptOpt' } -> `NloptOpt' #}
+
+nloptCreate :: (NloptAlgorithm) -> (Word) -> IO ((NloptOpt))
+nloptCreate a1 a2 =
+  let {a1' = (fromIntegral . fromEnum) a1} in
+  let {a2' = fromIntegral a2} in
+  nloptCreate'_ a1' a2' >>= \res ->
+  (newForeignPtr nlopt_destroy >=> (return . NloptOpt)) res >>= \res' ->
+  return (res')
+
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_create"
+  nloptCreate'_ :: (CInt -> (CUInt -> (IO (Ptr (NloptOpt)))))
+
+nloptCopy :: (NloptOpt) -> IO ((NloptOpt))
+nloptCopy a1 =
+  (withNloptOpt) a1 $ \a1' ->
+  nloptCopy'_ a1' >>= \res ->
+  (newForeignPtr nlopt_destroy >=> (return . NloptOpt)) res >>= \res' ->
+  return (res')
+
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_copy"
+  nloptCopy'_ :: ((Ptr (NloptOpt)) -> (IO (Ptr (NloptOpt))))
 
 -- I don't quite know how to get all the outputs and the vector
 -- allocation lined up for this one, so I've done it by hand.
@@ -244,7 +272,7 @@ nloptOptimize p i =
     outval <- peek optr
     return (outval, toEnum . fromIntegral $ res)
 
-foreign import ccall unsafe "NLOpt.chs.h nlopt_optimize"
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_optimize"
   nloptOptimize' :: Ptr NloptOpt -> Ptr Double -> Ptr Double -> IO CInt
 
 -- TODO(MP): Can we make anything that passes a StablePtr to the C
@@ -290,7 +318,7 @@ nloptGetLowerBounds n p =
     ret <- nloptGetLowerBounds' p' mvptr
     return . toEnum . fromIntegral $ ret
 
-foreign import ccall unsafe "NLOpt.chs.h nlopt_get_lower_bounds"
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_get_lower_bounds"
   nloptGetLowerBounds' :: Ptr NloptOpt -> Ptr Double -> IO CInt
 
 {#fun unsafe nlopt_set_upper_bounds as ^
@@ -305,7 +333,7 @@ nloptGetUpperBounds n p =
     ret <- nloptGetUpperBounds' p' mvptr
     return . toEnum . fromIntegral $ ret
 
-foreign import ccall unsafe "NLOpt.chs.h nlopt_get_upper_bounds"
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_get_upper_bounds"
   nloptGetUpperBounds' :: Ptr NloptOpt -> Ptr Double -> IO CInt
 
 {#fun unsafe nlopt_remove_inequality_constraints as ^
@@ -360,7 +388,7 @@ nloptGetXtolAbs n p =
     ret <- nloptGetXtolAbs' p' mvptr
     return . toEnum . fromIntegral $ ret
 
-foreign import ccall unsafe "NLOpt.chs.h nlopt_set_xtol_abs"
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_set_xtol_abs"
   nloptGetXtolAbs' :: Ptr NloptOpt -> Ptr Double -> IO CInt
 
 {#fun unsafe nlopt_set_maxeval as ^ { `NloptOpt', fromIntegral `Int' } -> `NloptResult' #}
@@ -399,5 +427,5 @@ nloptGetInitialStep p x0 =
     ret <- nloptGetInitialStep' p' x0ptr mvptr
     return . toEnum . fromIntegral $ ret
 
-foreign import ccall unsafe "NLOpt.chs.h nlopt_get_initial_step"
+foreign import ccall unsafe "Numeric/Optimization/NLOpt/Bindings.chs.h nlopt_get_initial_step"
   nloptGetInitialStep' :: Ptr NloptOpt -> Ptr Double -> Ptr Double -> IO CInt
